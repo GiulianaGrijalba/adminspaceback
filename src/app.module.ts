@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
 import typeormConfig from './config/typeorm';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { AuthModule } from './auth/auth.module';
+import { AdminModule } from './admin/admin.module';
+import { PropietarioModule } from './propietario/propietario.module';
+import { InquilinoModule } from './inquilino/inquilino.module';
 
 
 
@@ -21,6 +25,10 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
         return dbConfig;
       },
     }),
+    AuthModule,
+    AdminModule,
+    PropietarioModule,
+    InquilinoModule,
   ],
   controllers: [],
   providers: [],
