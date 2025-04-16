@@ -1,5 +1,6 @@
 import { StatusService } from "src/Complementos/enum.StatusService";
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from "typeorm";
+import { Unidad } from "./Propiedad";
 
 @Entity()
 export class Servicios {
@@ -15,18 +16,13 @@ export class Servicios {
     @Column()
     price:number
 
-    @Column()
-    type:string
-
     @Column({
         type: 'enum',
         enum: StatusService,
         default: StatusService.PENDIENTE
     })
-    status:string
-    @Column()
-    createdAt:Date
+    status:StatusService
 
-    @Column()
-    updatedAt:Date
+   @OneToOne(()=>Unidad, (unidad)=> unidad.servicios)
+   unidadServicios: Unidad
 }
