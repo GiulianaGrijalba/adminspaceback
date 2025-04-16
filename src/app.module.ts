@@ -5,10 +5,6 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AdministracionModule } from './administracion/administracion.module';
 import { InquilinoModule } from './inquilinos/inquilino.module';
 import { PropietariosModule } from './Propietarios/propietarios.module';
-// import { AuthModule } from './auth/auth.module';
-
-
-
 
 @Module({
   imports: [
