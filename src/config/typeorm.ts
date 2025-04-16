@@ -36,7 +36,11 @@ const config = {
   migrations: [__dirname + '/../**/*.migration{.ts,.js}'],
   synchronize: true,
   logging: true,
-  dropSchema: false
+  dropSchema: false,
+    // Añadir opciones de reintento
+    retryAttempts: 10,        // Aumenta el número de intentos
+    retryDelay: 3000,         // Espera más tiempo entre intentos
+    connectTimeoutMS: 10000   // Aumenta el tiempo de espera para la conexión
 };
 
 export default registerAs('typeorm', () => config);
