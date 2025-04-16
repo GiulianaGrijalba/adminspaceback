@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AdministracionController } from "./administracion.controller";
-import { User } from "src/Entities/User";
-import { Unidad } from "src/Entities/Propiedad";
+import { User } from "src/Entities/User.entity";
+import { Unidad } from "src/Entities/Unidad.entity";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AdministracionService } from "./administracion.service";
 

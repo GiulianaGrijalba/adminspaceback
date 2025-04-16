@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { UserRole } from "src/Complementos/enum.Role";
-import { Unidad } from "src/Entities/Propiedad";
-import { User } from "src/Entities/User";
+import { Unidad } from "src/Entities/Unidad.entity";
+import { User } from "src/Entities/User.entity";
 import { Repository } from "typeorm";
 
 @Injectable()

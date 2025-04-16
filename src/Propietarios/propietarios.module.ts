@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { Unidad } from "src/Entities/Propiedad";
-import { User } from "src/Entities/User";
+import { Unidad } from "src/Entities/Unidad.entity";
+import { User } from "src/Entities/User.entity";
 import { PropietariosController } from "./propietarios.controller";
 import { PropietariosService } from "./propietarios.service";
 
