@@ -7,7 +7,6 @@ import { AdministracionModule } from './administracion/administracion.module';
 import { InquilinoModule } from './inquilinos/inquilino.module';
 import { AuthModule } from './auth/auth.module';
 import { PropietariosModule } from './Propietarios/propietarios.module';
-import { AuthModule } from './auth/auth.module';
 
 
 
