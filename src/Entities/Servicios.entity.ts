@@ -1,6 +1,6 @@
 import { StatusService } from "src/Complementos/enum.StatusService";
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from "typeorm";
-import { Unidad } from "./Propiedad";
+import { Unidad } from "./Unidad.entity";
 
 @Entity()
 export class Servicios {
