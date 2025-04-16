@@ -2,12 +2,10 @@ import { Module } from '@nestjs/common';
 import {ConfigModule, ConfigService} from '@nestjs/config';
 import typeormConfig from './config/typeorm';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
-
-import { InquilinoModule } from './inquilino/inquilino.module';
-import { PropietarioModule } from './propietario/propietario.module';
 import { AdministracionModule } from './administracion/administracion.module';
-
+import { InquilinoModule } from './inquilinos/inquilino.module';
 import { AuthModule } from './auth/auth.module';
+import { PropietariosModule } from './Propietarios/propietarios.module';
 
 
 
@@ -27,8 +25,7 @@ import { AuthModule } from './auth/auth.module';
         return dbConfig;
       },
     }),
-    AuthModule,
-  InquilinoModule, PropietarioModule, AdministracionModule  
+    AuthModule, AdministracionModule, InquilinoModule,PropietariosModule
   ]
 })
 export class AppModule {}
