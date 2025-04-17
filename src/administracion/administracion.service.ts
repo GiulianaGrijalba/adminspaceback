@@ -1,23 +1,28 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { UserRole } from "src/Complementos/enum.Role";
-import { Unidad } from "src/Entities/Unidad.entity";
-import { User } from "src/Entities/User.entity";
-import { Repository } from "typeorm";
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { UserRole } from 'src/Complementos/enum.Role';
+import { Unidad } from 'src/Entities/Unidad.entity';
+import { User } from 'src/Entities/User.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class AdministracionService {
-    constructor(
-        @InjectRepository(User) private userRepository: Repository<User>,
-        @InjectRepository(Unidad) private unidadRepository: Repository<Unidad>
-    ){}
+  constructor(
+    @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Unidad) private unidadRepository: Repository<Unidad>,
+  ) {}
 
-    async findAll(){
-        const users = await this.userRepository.find()
+  async findAll() {
+    const users = await this.userRepository.find();
 
-        const propietarios=  users.filter(user=> user.Role === UserRole.PROPIETARIO)
-        const inquilinos=  users.filter(user=> user.Role === UserRole.INQUILINO)
-
-        return {propietarios, inquilinos}
+    if (users.length === 0) {
+      return 'No hay inquilinos ni propietarios registrados ';
     }
+    const propietarios = users.filter(
+      (user) => user.Role === UserRole.PROPIETARIO,
+    );
+    const inquilinos = users.filter((user) => user.Role === UserRole.INQUILINO);
+
+    return { propietarios, inquilinos };
+  }
 }
