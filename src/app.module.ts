@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import {ConfigModule, ConfigService} from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import typeormConfig from './config/typeorm';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AdministracionModule } from './administracion/administracion.module';
 import { InquilinoModule } from './inquilinos/inquilino.module';
 import { PropietariosModule } from './Propietarios/propietarios.module';
+
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { PropietariosModule } from './Propietarios/propietarios.module';
       load: [typeormConfig],
     }),
     TypeOrmModule.forRootAsync({
-      inject:[ConfigService],
+      inject: [ConfigService],
       useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
         const dbConfig = configService.get<TypeOrmModuleOptions>('typeorm');
         if (!dbConfig) {
@@ -23,8 +24,9 @@ import { PropietariosModule } from './Propietarios/propietarios.module';
       },
     }),
 
-    AdministracionModule, InquilinoModule,PropietariosModule
-  ]
-
+    AdministracionModule,
+    InquilinoModule,
+    PropietariosModule,
+  ],
 })
 export class AppModule {}
