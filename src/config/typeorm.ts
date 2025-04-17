@@ -6,7 +6,7 @@ dotenvConfig({ path: 'src/.env' });
 const config = {
   type: 'postgres',
   url: process.env.DB_URL,
-
+  
   autoLoadEntities: true,
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../**/*.migration{.ts,.js}'],
@@ -14,6 +14,7 @@ const config = {
   logging: false,
   dropSchema: false,
   ssl: false,
+
 };
 
 export default registerAs('typeorm', () => config);
