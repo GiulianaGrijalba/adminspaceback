@@ -14,8 +14,8 @@ Adress: string
 @ManyToOne(()=> User, (user)=> user.unidades)
 Propietario: User;
 
-@ManyToOne(()=> User, {nullable:true})
-inquilino: User
+@ManyToOne(()=> User, { nullable: true })
+inquilino: User | null;
 
 @OneToOne(()=> Servicios, (servicio)=> servicio.unidadServicios)
 @JoinColumn()

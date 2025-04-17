@@ -1,27 +1,28 @@
-# Imagen base
-FROM node:20
+FROM node:20-alpine AS development
 
-# Instalar bash
-RUN apt-get update && apt-get install -y bash
+WORKDIR /usr/src/app
 
-# Crear y usar directorio de trabajo
-WORKDIR /app
-
-# Copiar package.json y package-lock.json
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install
+RUN npm install --legacy-peer-deps
 
-# Copiar todo el proyecto
 COPY . .
-COPY src/.env .env  
 
-# Compilar el código TypeScript a JavaScript
 RUN npm run build
 
-# Exponer el puerto que usa NestJS
-EXPOSE 3000
+FROM node:20-alpine AS production
 
-# Comando para iniciar la app en producción
-CMD ["npm", "run", "start:prod"]
+ARG NODE_ENV=production
+ENV NODE_ENV=${NODE_ENV}
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+
+RUN npm install --only=production --legacy-peer-deps
+
+COPY . .
+
+COPY --from=development /usr/src/app/dist ./dist
+
+CMD ["node", "dist/main"]

@@ -1,5 +1,6 @@
-export enum DestinatarioNotificacion{
-    ADMIN='admin',
-    PROPIETARIO='propietario',
-    INQUILINO='inquilino'
+export enum DestinatarioNotificacion {
+    ADMIN = 'ADMIN',
+    PROPIETARIO = 'PROPIETARIO',
+    INQUILINO = 'INQUILINO',
+    TODOS = 'TODOS'
 }

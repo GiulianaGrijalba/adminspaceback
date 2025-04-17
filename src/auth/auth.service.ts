@@ -1,26 +1,67 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../Entities/User.entity';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private jwtService: JwtService,
+  ) {}
+
+  async register(registerDto: RegisterDto): Promise<User> {
+    const { Email, Password } = registerDto;
+
+    // Verificar que el usuario no exista
+    const userExists = await this.userRepository.findOne({
+      where: { Email }
+    });
+
+    if (userExists) {
+      throw new UnauthorizedException('El correo electrónico ya está registrado');
+    }
+
+    // Crear el usuario
+    const user = this.userRepository.create({
+      ...registerDto,
+      Password: this.hashPassword(Password),
+    });
+
+    return this.userRepository.save(user);
   }
 
-  findAll() {
-    return `This action returns all auth`;
+  async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
+    const { Email, Password } = loginDto;
+    
+    const user = await this.userRepository.findOne({
+      where: { Email }
+    });
+
+    if (!user || user.Password !== this.hashPassword(Password)) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    const payload = { 
+      sub: user.IdUser,
+      email: user.Email,
+      role: user.Role
+    };
+
+    const { Password: _, ...userWithoutPassword } = user;
+
+    return {
+      accessToken: this.jwtService.sign(payload),
+      user: userWithoutPassword,
+    };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
-
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+  private hashPassword(password: string): string {
+    return createHash('sha256').update(password).digest('hex');
   }
 }
