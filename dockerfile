@@ -1,6 +1,9 @@
 # Imagen base
 FROM node:20
 
+# Instalar bash
+RUN apt-get update && apt-get install -y bash
+
 # Crear y usar directorio de trabajo
 WORKDIR /app
 
@@ -12,6 +15,7 @@ RUN npm install
 
 # Copiar todo el proyecto
 COPY . .
+COPY src/.env .env  
 
 # Compilar el código TypeScript a JavaScript
 RUN npm run build
