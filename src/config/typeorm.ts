@@ -24,6 +24,9 @@ const config = {
   synchronize: true,
   logging: true,
   ssl: { rejectUnauthorized: false }, // Configuración SSL para Supabase
+  retryAttempts: 10,          // Número de reintentos
+  retryDelay: 3000,           // Tiempo de espera entre reintentos (ms)
+  connectTimeoutMS: 10000,    // Tiempo de espera de conexión (ms)
 };
 
 export default registerAs('typeorm', () => config);
