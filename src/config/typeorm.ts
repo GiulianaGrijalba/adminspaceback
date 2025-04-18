@@ -1,11 +1,20 @@
 import { registerAs } from '@nestjs/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { join } from 'path';
+import * as dotenv from 'dotenv';
 
+dotenv.config();
+
+// Logs para depuración
+console.log('DB_USER:', process.env.DB_USER);
+console.log('DB_PASSWORD exists:', !!process.env.DB_PASSWORD);
+console.log('DB_PASSWORD type:', typeof process.env.DB_PASSWORD);
+
+// Usa configuración hardcoded mientras solucionamos el problema de variables de entorno
 const config = {
   type: 'postgres',
   host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
+  port: Number(process.env.DB_PORT),
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
@@ -14,7 +23,7 @@ const config = {
   autoLoadEntities: true,
   synchronize: true,
   logging: true,
-  ssl: false
+  ssl: { rejectUnauthorized: false }, // Configuración SSL para Supabase
 };
 
 export default registerAs('typeorm', () => config);
