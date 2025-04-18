@@ -27,6 +27,9 @@ const config = {
   retryAttempts: 10,          // Número de reintentos
   retryDelay: 3000,           // Tiempo de espera entre reintentos (ms)
   connectTimeoutMS: 10000,    // Tiempo de espera de conexión (ms)
+  extra: {
+    family: 4 // Esto fuerza el uso de IPv4
+  }  
 };
 
 export default registerAs('typeorm', () => config);
