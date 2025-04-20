@@ -19,6 +19,7 @@ import {
   import { CreateServicioDto } from './dto/create-servicio.dto';
   import { UpdateServicioDto } from './dto/update-servicio.dto';
   import { CreateNotificacionDto } from './dto/create-notificacion.dto';
+import { CreateSolicitudDto } from './dto/create-solicitud.dto';
   
   @ApiTags('administracion')
   @Controller('administracion')
@@ -185,6 +186,15 @@ import {
     }
   
     // Endpoints de Solicitudes
+
+    @Post('solicitudes')
+    @ApiOperation({ summary: 'Crear nueva solicitud' })
+    @ApiResponse({ status: 201, description: 'Solicitud creada exitosamente' })
+    @ApiResponse({ status: 400, description: 'Datos de entrada inválidos' })
+    createSolicitud(@Body() createSolicitudDto: CreateSolicitudDto) {
+      return this.administracionService.createSolicitud(createSolicitudDto);
+    }
+    
     @Get('solicitudes')
     @ApiOperation({ summary: 'Obtener todas las solicitudes' })
     @ApiResponse({ status: 200, description: 'Lista de todas las solicitudes' })

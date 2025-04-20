@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CreateUnidadDto } from './dto/create-unidad.dto';
 import { CreateServicioDto } from './dto/create-servicio.dto';
@@ -6,6 +6,7 @@ import { UpdateServicioDto } from './dto/update-servicio.dto';
 import { CreateNotificacionDto } from './dto/create-notificacion.dto';
 import { StatusService } from '../Complementos/enum.StatusService';
 import { UserRole } from '../Complementos/enum.Role';
+import { DestinatarioNotificacion } from 'src/Complementos/enum.Notificacion';
 
 @Injectable()
 export class AdministracionService {
@@ -352,21 +353,43 @@ export class AdministracionService {
       throw new NotFoundException(`Unidad con ID ${unidadId} no encontrada`);
     }
     
-    // Crear servicio
+    // Crear servicio sin la referencia a la unidad
     const newServicio = {
       ...servicioData,
-      status: StatusService.PENDIENTE,
-      unidadServicios: unidadId
+      status: StatusService.PENDIENTE
     };
     
-    const { data, error } = await this.supabase
+    // Insertar el servicio
+    const { data: servicio, error: insertError } = await this.supabase
       .from('servicios')
       .insert(newServicio)
       .select()
       .single();
     
-    if (error) throw error;
-    return data;
+    if (insertError) {
+      console.error('Error al crear servicio:', insertError);
+      throw insertError;
+    }
+  
+    // Actualizar la unidad para que referencie al servicio creado
+    const { error: updateError } = await this.supabase
+      .from('unidad')
+      .update({ serviciosIdServicio: servicio.IdServicio })
+      .eq('idUnidad', unidadId);
+  
+    if (updateError) {
+      console.error('Error al actualizar la unidad:', updateError);
+      throw updateError;
+    }
+    
+    // Devolver el servicio creado junto con la info de la unidad
+    return {
+      ...servicio,
+      unidad: {
+        idUnidad: unidad.idUnidad,
+        Adress: unidad.Adress
+      }
+    };
   }
 
   async updateServicio(id: string, updateServicioDto: UpdateServicioDto) {
@@ -417,22 +440,78 @@ export class AdministracionService {
   }
 
   async createNotificacion(createNotificacionDto: CreateNotificacionDto) {
-    const newNotificacion = {
-      ...createNotificacionDto,
-      date: new Date(),
-      status: false
-    };
+    const { destinatarios, ...notificationData } = createNotificacionDto;
     
-    const { data, error } = await this.supabase
-      .from('notificaciones')
-      .insert(newNotificacion)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
+    // Si el destinatario es TODOS, crear múltiples notificaciones
+    if (destinatarios === DestinatarioNotificacion.TODOS) {
+      // Mapeo de los valores del enum a los valores de la base de datos
+      const destinatariosArray = [
+        'admin',  // Valor en la base de datos para ADMIN
+        'propietario',  // Valor en la base de datos para PROPIETARIO
+        'inquilino'  // Valor en la base de datos para INQUILINO
+      ];
+      
+      const notificaciones: any[] = [];
+      
+      // Crear una notificación para cada tipo de destinatario
+      for (const dest of destinatariosArray) {
+        const newNotificacion = {
+          ...notificationData,
+          destinatarios: dest,  // Usar el valor de la base de datos directamente
+          date: new Date(),
+          status: false
+        };
+        
+        const { data, error } = await this.supabase
+          .from('notificaciones')
+          .insert(newNotificacion)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        notificaciones.push(data);
+      }
+      
+      return { 
+        message: 'Notificaciones creadas para todos los tipos de usuarios',
+        notificaciones 
+      };
+    } else {
+      // Si no es TODOS, mapear el valor del enum al valor de la base de datos
+      let dbValue: string;
+      
+      // Mapear cada valor del enum a su equivalente en la base de datos
+      switch (destinatarios) {
+        case DestinatarioNotificacion.ADMIN:
+          dbValue = 'admin';
+          break;
+        case DestinatarioNotificacion.PROPIETARIO:
+          dbValue = 'propietario';
+          break;
+        case DestinatarioNotificacion.INQUILINO:
+          dbValue = 'inquilino';
+          break;
+        default:
+          dbValue = 'admin';  // Valor por defecto
+      }
+      
+      const newNotificacion = {
+        ...notificationData,
+        destinatarios: dbValue,  // Usar el valor mapeado
+        date: new Date(),
+        status: false
+      };
+      
+      const { data, error } = await this.supabase
+        .from('notificaciones')
+        .insert(newNotificacion)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
   }
-
   async markNotificacionAsRead(id: string) {
     const { data, error } = await this.supabase
       .from('notificaciones')
@@ -491,4 +570,50 @@ export class AdministracionService {
     if (error) throw error;
     return data;
   }
+  async createSolicitud(createSolicitudDto: any) {
+    const { solicitanteId, tipoSolicitante, ...solicitudData } = createSolicitudDto;
+    
+    // Validar que exista un solicitante
+    if (!solicitanteId) {
+      throw new BadRequestException('Se requiere información del solicitante');
+    }
+    
+    // Obtener información del solicitante para incluirla en la descripción
+    let infoSolicitante = '';
+    try {
+      const { data: usuario, error } = await this.supabase
+        .from('user')
+        .select('*')
+        .eq('IdUser', solicitanteId)
+        .single();
+      
+      if (!error && usuario) {
+        infoSolicitante = `\n\nSolicitado por: ${usuario.Name} ${usuario.LastName} (${usuario.Email})`;
+      } else {
+        infoSolicitante = `\n\nSolicitado por usuario con ID: ${solicitanteId}`;
+      }
+    } catch (e) {
+      infoSolicitante = `\n\nSolicitado por usuario con ID: ${solicitanteId}`;
+    }
+    
+    // Agregar la información del solicitante a la descripción
+    const descriptionWithSolicitante = solicitudData.description + infoSolicitante;
+    
+    const newSolicitud = {
+      ...solicitudData,
+      description: descriptionWithSolicitante,
+      date: new Date(),
+      status: false
+    };
+    
+    const { data, error } = await this.supabase
+      .from('solicitud')
+      .insert(newSolicitud)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+  
 }
