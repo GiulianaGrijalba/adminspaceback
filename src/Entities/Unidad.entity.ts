@@ -1,23 +1,16 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { User } from "./User.entity";
 import { Servicios } from "./Servicios.entity";
 
-@Entity()
-export class Unidad {
- 
-@PrimaryGeneratedColumn('uuid')
-idUnidad: string;
-
-@Column()
-Adress: string
-
-@ManyToOne(()=> User, (user)=> user.unidades)
-Propietario: User;
-
-@ManyToOne(()=> User, { nullable: true })
-inquilino: User | null;
-
-@OneToOne(()=> Servicios, (servicio)=> servicio.unidadServicios)
-@JoinColumn()
-servicios: Servicios
+// Interfaz actualizada para coincidir con la estructura de Supabase
+export interface Unidad {
+    idUnidad: string;
+    Adress: string;
+    propietarioIdUser: string; // ID del propietario (nombre de columna en Supabase)
+    inquilinoIdUser?: string | null; // ID del inquilino (nombre de columna en Supabase)
+    serviciosIdServicio?: string | null; // ID del servicio (nombre de columna en Supabase)
+    
+    // Propiedades virtuales para objetos relacionados (no están en la tabla real)
+    propietario?: User; 
+    inquilino?: User | null;
+    servicios?: Servicios[] | null;
 }

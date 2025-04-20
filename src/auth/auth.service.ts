@@ -1,18 +1,17 @@
-import { Injectable, UnauthorizedException, Res } from '@nestjs/common'; //agregar Res
+import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { User } from '../Entities/User.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { createHash } from 'crypto';
-import { Response } from 'express' //agregar
+import { Response } from 'express';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @Inject('SUPABASE_CLIENT')
+    private supabase: SupabaseClient,
     private jwtService: JwtService,
   ) {}
 
@@ -20,75 +19,79 @@ export class AuthService {
     const { Email, Password } = registerDto;
 
     // Verificar que el usuario no exista
-    const userExists = await this.userRepository.findOne({
-      where: { Email }
-    });
+    const { data: existingUser, error: findError } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('Email', Email)
+      .single();
 
-    if (userExists) {
+    if (findError && findError.code !== 'PGRST116') { // PGRST116 es el código cuando no se encuentra el registro
+      throw findError;
+    }
+
+    if (existingUser) {
       throw new UnauthorizedException('El correo electrónico ya está registrado');
     }
 
     // Crear el usuario
-    const user = this.userRepository.create({
+    const hashedPassword = this.hashPassword(Password);
+    const userData = {
       ...registerDto,
-      Password: this.hashPassword(Password),
-    });
+      Password: hashedPassword,
+    };
 
-    return this.userRepository.save(user);
+    const { data: newUser, error: insertError } = await this.supabase
+      .from('user')
+      .insert(userData)
+      .select()
+      .single();
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    return newUser;
   }
 
-  //CAMBIAR ESTO
-  // async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
-  //   const { Email, Password } = loginDto;
-  //   const user = await this.userRepository.findOne({
-  //     where: { Email }
-  //   });
-  //   if (!user || user.Password !== this.hashPassword(Password)) {
-  //     throw new UnauthorizedException('Credenciales inválidas');
-  //   }
-  //   const payload = { 
-  //     sub: user.IdUser,
-  //     email: user.Email,
-  //     role: user.Role
-  //   };
-  //   const { Password: _, ...userWithoutPassword } = user;
-  //   return {
-  //     accessToken: this.jwtService.sign(payload),
-  //     user: userWithoutPassword,
-  //   };
-  // }
-
-
-
-
-  //POR ESTO:
-  async login(loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ user: Partial<User> }> {
-    const { Email, Password } = loginDto
-    const user = await this.userRepository.findOne({
-      where: { Email }
-    })
-    if (!user || user.Password !== this.hashPassword(Password)) {
-      throw new UnauthorizedException('Credenciales inválidas')
+  async login(loginDto: LoginDto, res: Response): Promise<{ user: Partial<User>, accessToken: string }> {
+    const { Email, Password } = loginDto;
+    
+    // Consulta a Supabase (asegúrate de que esté usando 'user' y no 'users')
+    const { data: user, error } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('Email', Email)
+      .single();
+  
+    if (error || !user || user.Password !== this.hashPassword(Password)) {
+      throw new UnauthorizedException('Credenciales inválidas');
     }
+  
     const payload = {
       sub: user.IdUser,
       email: user.Email,
       role: user.Role
-    }
-    const token = this.jwtService.sign(payload)
-    // ✅ Seteamos la cookie con el token
+    };
+    
+    const token = this.jwtService.sign(payload);
+    
+    // Mantener la cookie para compatibilidad
     res.cookie('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 1000 * 60 * 60 * 24 // 1 día
-    })
-    const { Password: _, ...userWithoutPassword } = user
+    });
+    
+    const { Password: _, ...userWithoutPassword } = user;
+    
+    // Devolver también el token en la respuesta
     return {
-      user: userWithoutPassword
-    }
+      user: userWithoutPassword,
+      accessToken: token 
+    };
   }
-
+  
   private hashPassword(password: string): string {
     return createHash('sha256').update(password).digest('hex');
   }

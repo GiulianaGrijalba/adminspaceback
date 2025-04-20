@@ -1,16 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../../Entities/User.entity';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
+    @Inject('SUPABASE_CLIENT')
+    private supabase: SupabaseClient,
     private configService: ConfigService,
   ) {
     super({
@@ -22,11 +20,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     const { sub: IdUser } = payload;
 
-    const user = await this.userRepository.findOne({
-      where: { IdUser },
-    });
+    const { data: user, error } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('IdUser', IdUser)
+      .single();
 
-    if (!user) {
+    if (error || !user) {
       throw new UnauthorizedException('Usuario no válido');
     }
 

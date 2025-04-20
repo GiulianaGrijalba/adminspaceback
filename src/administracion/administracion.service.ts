@@ -1,11 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../Entities/User.entity';
-import { Unidad } from '../Entities/Unidad.entity';
-import { Servicios } from '../Entities/Servicios.entity';
-import { Notificaciones } from '../Entities/Notificaciones.entity';
-import { Solicitud } from '../Entities/Solicitud.entity';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { CreateUnidadDto } from './dto/create-unidad.dto';
 import { CreateServicioDto } from './dto/create-servicio.dto';
 import { UpdateServicioDto } from './dto/update-servicio.dto';
@@ -16,264 +10,485 @@ import { UserRole } from '../Complementos/enum.Role';
 @Injectable()
 export class AdministracionService {
   constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    
-    @InjectRepository(Unidad)
-    private unidadRepository: Repository<Unidad>,
-    
-    @InjectRepository(Servicios)
-    private serviciosRepository: Repository<Servicios>,
-    
-    @InjectRepository(Notificaciones)
-    private notificacionesRepository: Repository<Notificaciones>,
-    
-    @InjectRepository(Solicitud)
-    private solicitudRepository: Repository<Solicitud>,
+    @Inject('SUPABASE_CLIENT')
+    private supabase: SupabaseClient
   ) {}
 
   // Gestión de Usuarios
   async getAllUsers() {
-    return this.userRepository.find();
+    const { data, error } = await this.supabase
+      .from('user')
+      .select('*');
+    
+    if (error) throw error;
+    return data;
   }
 
   async getUserById(id: string) {
-    const user = await this.userRepository.findOne({
-      where: { IdUser: id },
-      relations: ['unidades'],
-    });
+    // Obtener usuario
+    const { data: user, error: userError } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('IdUser', id)
+      .single();
     
+    if (userError) throw userError;
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
     
-    return user;
+    // Obtener unidades relacionadas
+    const { data: unidades, error: unidadesError } = await this.supabase
+      .from('unidad')
+      .select('*')
+      .eq('propietarioIdUser', id);  // Cambiado: Propietario -> propietarioIdUser
+    
+    if (unidadesError) throw unidadesError;
+    
+    return { ...user, unidades };
   }
 
   async getPropietarios() {
-    return this.userRepository.find({
-      where: { Role: UserRole.PROPIETARIO },
-      relations: ['unidades'],
-    });
+    // Obtener propietarios
+    const { data: propietarios, error: propietariosError } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('Role', UserRole.PROPIETARIO);
+    
+    if (propietariosError) throw propietariosError;
+    
+    // Para cada propietario, obtener sus unidades
+    const propietariosWithUnidades = await Promise.all(
+      propietarios.map(async (propietario) => {
+        const { data: unidades, error: unidadesError } = await this.supabase
+          .from('unidad')
+          .select('*')
+          .eq('propietarioIdUser', propietario.IdUser);  // Cambiado: Propietario -> propietarioIdUser
+        
+        if (unidadesError) throw unidadesError;
+        
+        return { ...propietario, unidades };
+      })
+    );
+    
+    return propietariosWithUnidades;
   }
 
   async getInquilinos() {
-    return this.userRepository.find({
-      where: { Role: UserRole.INQUILINO },
-    });
+    const { data, error } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('Role', UserRole.INQUILINO);
+    
+    if (error) throw error;
+    return data;
   }
 
   // Gestión de Unidades
   async getAllUnidades() {
-    return this.unidadRepository.find({
-      relations: ['Propietario', 'inquilino', 'servicios'],
-    });
+    const { data: unidades, error: unidadesError } = await this.supabase
+      .from('unidad')
+      .select('*');
+    
+    if (unidadesError) throw unidadesError;
+    
+    // Para cada unidad, obtener datos relacionados
+    const unidadesWithRelations = await Promise.all(
+      unidades.map(async (unidad) => {
+        // Obtener propietario
+        const { data: propietario, error: propietarioError } = await this.supabase
+          .from('user')
+          .select('*')
+          .eq('IdUser', unidad.propietarioIdUser)  // Cambiado: Propietario -> propietarioIdUser
+          .single();
+        
+        if (propietarioError && propietarioError.code !== 'PGRST116') throw propietarioError;
+        
+        // Obtener inquilino si existe
+        let inquilino = null;
+        if (unidad.inquilinoIdUser) {  // Cambiado: inquilino -> inquilinoIdUser
+          const { data: inquilinoData, error: inquilinoError } = await this.supabase
+            .from('user')
+            .select('*')
+            .eq('IdUser', unidad.inquilinoIdUser)  // Cambiado: inquilino -> inquilinoIdUser
+            .single();
+          
+          if (inquilinoError && inquilinoError.code !== 'PGRST116') throw inquilinoError;
+          inquilino = inquilinoData;
+        }
+        
+        // Obtener servicios
+        const { data: servicios, error: serviciosError } = await this.supabase
+          .from('servicios')
+          .select('*')
+          .eq('unidadServicios', unidad.idUnidad);
+        
+        if (serviciosError) throw serviciosError;
+        
+        return {
+          ...unidad,
+          propietario: propietario || null,  // Cambiado el nombre para mantener consistencia
+          inquilino,
+          servicios: servicios || []
+        };
+      })
+    );
+    
+    return unidadesWithRelations;
   }
 
   async getUnidadById(id: string) {
-    const unidad = await this.unidadRepository.findOne({
-      where: { idUnidad: id },
-      relations: ['Propietario', 'inquilino', 'servicios'],
-    });
+    // Obtener unidad
+    const { data: unidad, error: unidadError } = await this.supabase
+      .from('unidad')
+      .select('*')
+      .eq('idUnidad', id)
+      .single();
     
+    if (unidadError) throw unidadError;
     if (!unidad) {
       throw new NotFoundException(`Unidad con ID ${id} no encontrada`);
     }
     
-    return unidad;
+    // Obtener propietario
+    const { data: propietario, error: propietarioError } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('IdUser', unidad.propietarioIdUser)  // Cambiado: Propietario -> propietarioIdUser
+      .single();
+    
+    if (propietarioError && propietarioError.code !== 'PGRST116') throw propietarioError;
+    
+    // Obtener inquilino si existe
+    let inquilino = null;
+    if (unidad.inquilinoIdUser) {  // Cambiado: inquilino -> inquilinoIdUser
+      const { data: inquilinoData, error: inquilinoError } = await this.supabase
+        .from('user')
+        .select('*')
+        .eq('IdUser', unidad.inquilinoIdUser)  // Cambiado: inquilino -> inquilinoIdUser
+        .single();
+      
+      if (inquilinoError && inquilinoError.code !== 'PGRST116') throw inquilinoError;
+      inquilino = inquilinoData;
+    }
+    
+    // Obtener servicios
+    const { data: servicios, error: serviciosError } = await this.supabase
+      .from('servicios')
+      .select('*')
+      .eq('unidadServicios', id);
+    
+    if (serviciosError) throw serviciosError;
+    
+    return {
+      ...unidad,
+      propietario: propietario || null,  // Cambiado el nombre para mantener consistencia
+      inquilino,
+      servicios: servicios || []
+    };
   }
 
   async createUnidad(createUnidadDto: CreateUnidadDto) {
     const { propietarioId, inquilinoId, ...unidadData } = createUnidadDto;
     
-    const propietario = await this.userRepository.findOne({
-      where: { IdUser: propietarioId },
-    });
+    // Verificar que el propietario existe
+    const { data: propietario, error: propietarioError } = await this.supabase
+      .from('user')
+      .select('*')
+      .eq('IdUser', propietarioId)
+      .single();
     
+    if (propietarioError) throw propietarioError;
     if (!propietario) {
       throw new NotFoundException(`Propietario con ID ${propietarioId} no encontrado`);
     }
     
-    let inquilino: User | null = null;
+    // Verificar que el inquilino existe si se proporciona
+    let inquilino = null;
     if (inquilinoId) {
-      const inquilinoFound = await this.userRepository.findOne({
-        where: { IdUser: inquilinoId },
-      });
+      const { data: inquilinoData, error: inquilinoError } = await this.supabase
+        .from('user')
+        .select('*')
+        .eq('IdUser', inquilinoId)
+        .single();
       
-      if (!inquilinoFound) {
+      if (inquilinoError) throw inquilinoError;
+      if (!inquilinoData) {
         throw new NotFoundException(`Inquilino con ID ${inquilinoId} no encontrado`);
       }
       
-      inquilino = inquilinoFound;
+      inquilino = inquilinoData;
     }
     
-    const newUnidad = this.unidadRepository.create({
+    // Crear la unidad
+    const newUnidad = {
       ...unidadData,
-      Propietario: propietario,
-      inquilino,
-    } as any);
+      propietarioIdUser: propietarioId,  // Cambiado: Propietario -> propietarioIdUser
+      inquilinoIdUser: inquilinoId || null  // Cambiado: inquilino -> inquilinoIdUser
+    };
     
-    return this.unidadRepository.save(newUnidad);
+    const { data, error } = await this.supabase
+      .from('unidad')
+      .insert(newUnidad)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async updateUnidad(id: string, updateUnidadDto: Partial<CreateUnidadDto>) {
-    const unidad = await this.getUnidadById(id);
+    // Verificar que la unidad existe
+    const { data: unidad, error: unidadError } = await this.supabase
+      .from('unidad')
+      .select('*')
+      .eq('idUnidad', id)
+      .single();
+    
+    if (unidadError) throw unidadError;
+    if (!unidad) {
+      throw new NotFoundException(`Unidad con ID ${id} no encontrada`);
+    }
+    
+    const updateData: any = {};
     
     if (updateUnidadDto.propietarioId) {
-      const propietario = await this.userRepository.findOne({
-        where: { IdUser: updateUnidadDto.propietarioId },
-      });
+      // Verificar que el propietario existe
+      const { data: propietario, error: propietarioError } = await this.supabase
+        .from('user')
+        .select('*')
+        .eq('IdUser', updateUnidadDto.propietarioId)
+        .single();
       
+      if (propietarioError) throw propietarioError;
       if (!propietario) {
         throw new NotFoundException(`Propietario con ID ${updateUnidadDto.propietarioId} no encontrado`);
       }
       
-      unidad.Propietario = propietario;
+      updateData.propietarioIdUser = updateUnidadDto.propietarioId;  // Cambiado: Propietario -> propietarioIdUser
     }
     
     if (updateUnidadDto.inquilinoId) {
-      const inquilino = await this.userRepository.findOne({
-        where: { IdUser: updateUnidadDto.inquilinoId },
-      });
+      // Verificar que el inquilino existe
+      const { data: inquilino, error: inquilinoError } = await this.supabase
+        .from('user')
+        .select('*')
+        .eq('IdUser', updateUnidadDto.inquilinoId)
+        .single();
       
+      if (inquilinoError) throw inquilinoError;
       if (!inquilino) {
         throw new NotFoundException(`Inquilino con ID ${updateUnidadDto.inquilinoId} no encontrado`);
       }
       
-      unidad.inquilino = inquilino;
+      updateData.inquilinoIdUser = updateUnidadDto.inquilinoId;  // Cambiado: inquilino -> inquilinoIdUser
     } else if (updateUnidadDto.inquilinoId === null) {
-      unidad.inquilino = null as any;
+      updateData.inquilinoIdUser = null;  // Cambiado: inquilino -> inquilinoIdUser
     }
     
     if (updateUnidadDto.Adress) {
-      unidad.Adress = updateUnidadDto.Adress;
+      updateData.Adress = updateUnidadDto.Adress;
     }
     
-    return this.unidadRepository.save(unidad);
+    // Actualizar la unidad
+    const { data, error } = await this.supabase
+      .from('unidad')
+      .update(updateData)
+      .eq('idUnidad', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async removeUnidad(id: string) {
-    const unidad = await this.getUnidadById(id);
-    return this.unidadRepository.remove(unidad);
+    const { error } = await this.supabase
+      .from('unidad')
+      .delete()
+      .eq('idUnidad', id);
+    
+    if (error) throw error;
+    return { success: true };
   }
 
   // Gestión de Servicios
   async getAllServicios() {
-    return this.serviciosRepository.find({
-      relations: ['unidadServicios'],
-    });
+    const { data, error } = await this.supabase
+      .from('servicios')
+      .select('*');
+    
+    if (error) throw error;
+    return data;
   }
 
   async getServicioById(id: string) {
-    const servicio = await this.serviciosRepository.findOne({
-      where: { IdServicio: id },
-      relations: ['unidadServicios'],
-    });
+    const { data, error } = await this.supabase
+      .from('servicios')
+      .select('*')
+      .eq('IdServicio', id)
+      .single();
     
-    if (!servicio) {
+    if (error) throw error;
+    if (!data) {
       throw new NotFoundException(`Servicio con ID ${id} no encontrado`);
     }
     
-    return servicio;
+    return data;
   }
 
   async createServicio(createServicioDto: CreateServicioDto) {
     const { unidadId, ...servicioData } = createServicioDto;
     
-    const unidad = await this.unidadRepository.findOne({
-      where: { idUnidad: unidadId },
-    });
+    // Verificar que la unidad existe
+    const { data: unidad, error: unidadError } = await this.supabase
+      .from('unidad')
+      .select('*')
+      .eq('idUnidad', unidadId)
+      .single();
     
+    if (unidadError) throw unidadError;
     if (!unidad) {
       throw new NotFoundException(`Unidad con ID ${unidadId} no encontrada`);
     }
     
-    const newServicio = this.serviciosRepository.create({
+    // Crear servicio
+    const newServicio = {
       ...servicioData,
       status: StatusService.PENDIENTE,
-    });
+      unidadServicios: unidadId
+    };
     
-    const savedServicio = await this.serviciosRepository.save(newServicio);
+    const { data, error } = await this.supabase
+      .from('servicios')
+      .insert(newServicio)
+      .select()
+      .single();
     
-    // Asociar el servicio con la unidad
-    unidad.servicios = savedServicio;
-    await this.unidadRepository.save(unidad);
-    
-    return savedServicio;
+    if (error) throw error;
+    return data;
   }
 
   async updateServicio(id: string, updateServicioDto: UpdateServicioDto) {
-    const servicio = await this.getServicioById(id);
+    const { data, error } = await this.supabase
+      .from('servicios')
+      .update(updateServicioDto)
+      .eq('IdServicio', id)
+      .select()
+      .single();
     
-    const updatedServicio = Object.assign(servicio, updateServicioDto);
-    return this.serviciosRepository.save(updatedServicio);
+    if (error) throw error;
+    return data;
   }
 
   async removeServicio(id: string) {
-    const servicio = await this.getServicioById(id);
-    return this.serviciosRepository.remove(servicio);
+    const { error } = await this.supabase
+      .from('servicios')
+      .delete()
+      .eq('IdServicio', id);
+    
+    if (error) throw error;
+    return { success: true };
   }
 
   // Gestión de Notificaciones
   async getAllNotificaciones() {
-    return this.notificacionesRepository.find();
+    const { data, error } = await this.supabase
+      .from('notificaciones')
+      .select('*');
+    
+    if (error) throw error;
+    return data;
   }
 
   async getNotificacionById(id: string) {
-    const notificacion = await this.notificacionesRepository.findOne({
-      where: { idNotificacion: id },
-    });
+    const { data, error } = await this.supabase
+      .from('notificaciones')
+      .select('*')
+      .eq('idNotificacion', id)
+      .single();
     
-    if (!notificacion) {
+    if (error) throw error;
+    if (!data) {
       throw new NotFoundException(`Notificación con ID ${id} no encontrada`);
     }
     
-    return notificacion;
+    return data;
   }
 
   async createNotificacion(createNotificacionDto: CreateNotificacionDto) {
-    const newNotificacion = this.notificacionesRepository.create({
+    const newNotificacion = {
       ...createNotificacionDto,
       date: new Date(),
-      status: false,
-    });
+      status: false
+    };
     
-    return this.notificacionesRepository.save(newNotificacion);
+    const { data, error } = await this.supabase
+      .from('notificaciones')
+      .insert(newNotificacion)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   async markNotificacionAsRead(id: string) {
-    const notificacion = await this.getNotificacionById(id);
+    const { data, error } = await this.supabase
+      .from('notificaciones')
+      .update({ status: true })
+      .eq('idNotificacion', id)
+      .select()
+      .single();
     
-    notificacion.status = true;
-    return this.notificacionesRepository.save(notificacion);
+    if (error) throw error;
+    return data;
   }
 
   async removeNotificacion(id: string) {
-    const notificacion = await this.getNotificacionById(id);
-    return this.notificacionesRepository.remove(notificacion);
+    const { error } = await this.supabase
+      .from('notificaciones')
+      .delete()
+      .eq('idNotificacion', id);
+    
+    if (error) throw error;
+    return { success: true };
   }
 
   // Gestión de Solicitudes
   async getAllSolicitudes() {
-    return this.solicitudRepository.find();
+    const { data, error } = await this.supabase
+      .from('solicitud')
+      .select('*');
+    
+    if (error) throw error;
+    return data;
   }
 
   async getSolicitudById(id: string) {
-    const solicitud = await this.solicitudRepository.findOne({
-      where: { idSolicitud: id },
-    });
+    const { data, error } = await this.supabase
+      .from('solicitud')
+      .select('*')
+      .eq('idSolicitud', id)
+      .single();
     
-    if (!solicitud) {
+    if (error) throw error;
+    if (!data) {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
     
-    return solicitud;
+    return data;
   }
 
   async updateSolicitudStatus(id: string, status: boolean) {
-    const solicitud = await this.getSolicitudById(id);
+    const { data, error } = await this.supabase
+      .from('solicitud')
+      .update({ status })
+      .eq('idSolicitud', id)
+      .select()
+      .single();
     
-    solicitud.status = status;
-    return this.solicitudRepository.save(solicitud);
+    if (error) throw error;
+    return data;
   }
 }

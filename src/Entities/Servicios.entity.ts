@@ -1,28 +1,12 @@
 import { StatusService } from "src/Complementos/enum.StatusService";
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from "typeorm";
 import { Unidad } from "./Unidad.entity";
 
-@Entity()
-export class Servicios {
-    @PrimaryGeneratedColumn('uuid')
+// Convertido a interface desde la entidad TypeORM
+export interface Servicios {
     IdServicio: string;
-
-    @Column()
-    name:string
-
-    @Column()
-    description:string
-
-    @Column()
-    price:number
-
-    @Column({
-        type: 'enum',
-        enum: StatusService,
-        default: StatusService.PENDIENTE
-    })
-    status:StatusService
-
-   @OneToOne(()=>Unidad, (unidad)=> unidad.servicios)
-   unidadServicios: Unidad
+    name: string;
+    description: string;
+    price: number;
+    status: StatusService;
+    unidadServicios?: Unidad; // Relación con Unidad (opcional para flexibilidad)
 }
