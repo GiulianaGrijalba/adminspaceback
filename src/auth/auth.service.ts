@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Res } from '@nestjs/common'; //agregar Res
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,6 +6,7 @@ import { User } from '../Entities/User.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { createHash } from 'crypto';
+import { Response } from 'express' //agregar
 
 @Injectable()
 export class AuthService {
@@ -36,29 +37,56 @@ export class AuthService {
     return this.userRepository.save(user);
   }
 
-  async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
-    const { Email, Password } = loginDto;
-    
+  //CAMBIAR ESTO
+  // async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
+  //   const { Email, Password } = loginDto;
+  //   const user = await this.userRepository.findOne({
+  //     where: { Email }
+  //   });
+  //   if (!user || user.Password !== this.hashPassword(Password)) {
+  //     throw new UnauthorizedException('Credenciales inválidas');
+  //   }
+  //   const payload = { 
+  //     sub: user.IdUser,
+  //     email: user.Email,
+  //     role: user.Role
+  //   };
+  //   const { Password: _, ...userWithoutPassword } = user;
+  //   return {
+  //     accessToken: this.jwtService.sign(payload),
+  //     user: userWithoutPassword,
+  //   };
+  // }
+
+
+
+
+  //POR ESTO:
+  async login(loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<{ user: Partial<User> }> {
+    const { Email, Password } = loginDto
     const user = await this.userRepository.findOne({
       where: { Email }
-    });
-
+    })
     if (!user || user.Password !== this.hashPassword(Password)) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Credenciales inválidas')
     }
-
-    const payload = { 
+    const payload = {
       sub: user.IdUser,
       email: user.Email,
       role: user.Role
-    };
-
-    const { Password: _, ...userWithoutPassword } = user;
-
+    }
+    const token = this.jwtService.sign(payload)
+    // ✅ Seteamos la cookie con el token
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 24 // 1 día
+    })
+    const { Password: _, ...userWithoutPassword } = user
     return {
-      accessToken: this.jwtService.sign(payload),
-      user: userWithoutPassword,
-    };
+      user: userWithoutPassword
+    }
   }
 
   private hashPassword(password: string): string {
