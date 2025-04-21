@@ -1,9 +1,22 @@
-import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+// import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
 
-@Entity()
+// // Convertido a interface desde la entidad TypeORM
+// export interface Solicitud {
+//     idSolicitud: string;
+//     title: string;
+//     description: string;
+//     status: boolean;
+//     date: Date;
+//     destinatarios: DestinatarioNotificacion;
+// }
+
+
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from "typeorm";
+import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
+
+@Entity({ name: "solicitudes" })
 export class Solicitud {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn("uuid")
     idSolicitud: string;
 
     @Column()
@@ -12,17 +25,12 @@ export class Solicitud {
     @Column()
     description: string;
 
-    @Column({
-        default:false
-    })
+    @Column({ default: false })
     status: boolean;
 
     @Column()
     date: Date;
 
-    @Column({type: 'enum',
-        enum: DestinatarioNotificacion,
-        default: DestinatarioNotificacion.ADMIN
-    })
-    destinatarios: DestinatarioNotificacion;
+    @Column()
+    destinatarios: DestinatarioNotificacion; // Asegúrate de que este tipo sea compatible
 }

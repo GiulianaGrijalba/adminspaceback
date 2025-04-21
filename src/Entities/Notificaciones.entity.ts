@@ -1,17 +1,25 @@
-import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+// import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
 
-@Entity()
-export class Notificaciones {
-    @PrimaryGeneratedColumn('uuid')
+import { DestinatarioNotificacion } from "src/Complementos/enum.Notificacion";
+
+// // Convertido a interface desde la entidad TypeORM
+// export interface Notificaciones {
+//     idNotificacion: string;
+//     destinatarios: DestinatarioNotificacion;
+//     title: string;
+//     description: string;
+//     status: boolean;
+//     date: Date;
+// }
+
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+
+@Entity({ name: "notificaciones" })
+export class Notificacion {
+    @PrimaryGeneratedColumn("uuid")
     idNotificacion: string;
 
-
-    @Column({
-        type: 'enum',
-        enum: DestinatarioNotificacion,
-        default: DestinatarioNotificacion.ADMIN
-    })
+    @Column()
     destinatarios: DestinatarioNotificacion;
 
     @Column()
@@ -20,11 +28,16 @@ export class Notificaciones {
     @Column()
     description: string;
 
-    @Column({
-        default:false
-    })
+    @Column({ default: false })
     status: boolean;
 
     @Column()
     date: Date;
+
+    // Puedes agregar métodos aquí si es necesario
+    markAsRead() {
+        this.status = true;
+    }
+
+    // Otros métodos que necesites
 }
