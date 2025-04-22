@@ -53,6 +53,8 @@ export class AuthService {
     return newUser;
   }
 
+  
+
   async login(loginDto: LoginDto, res: Response): Promise<{ user: Partial<User>, accessToken: string }> {
     const { Email, Password } = loginDto;
     
