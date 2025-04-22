@@ -1,10 +1,11 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Res } from '@nestjs/common';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -25,7 +26,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
  
  
-  //agregar esto 👇
+  //agregar esto 
 
  async login(
   @Body() loginDto: LoginDto,
@@ -38,5 +39,15 @@ export class AuthController {
 logout(@Res({ passthrough: true }) res: Response) {
   res.clearCookie('auth_token')
   return { message: 'Sesión cerrada' }
+}
+
+@Get('me')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiOperation({ summary: 'Obtener información del usuario autenticado' })
+@ApiResponse({ status: 200, description: 'Información del usuario obtenida exitosamente' })
+@ApiResponse({ status: 401, description: 'No autorizado' })
+getProfile(@Req() req) {
+  return this.authService.getProfile(req.user);
 }
 }

@@ -92,6 +92,10 @@ export class AuthService {
     };
   }
   
+  getProfile(user: any) {
+    return user; // El usuario ya viene sin la contraseña gracias a la estrategia JWT
+  }
+  
   private hashPassword(password: string): string {
     return createHash('sha256').update(password).digest('hex');
   }
